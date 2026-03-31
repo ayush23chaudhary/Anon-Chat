@@ -3,6 +3,11 @@
  * Manages connections to chat rooms and message synchronization
  */
 
+// Environment variables for backend API and WebSocket URLs
+// Defaults to localhost for development, overridden by Vite build-time env vars for production
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081/api'
+const WS_BASE_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8081/api/ws/chat'
+
 class ChatService {
   constructor() {
     this.ws = null
@@ -25,14 +30,11 @@ class ChatService {
     this.connectionCallback = onConnectionChange
 
     try {
-      // Try to connect to WebSocket server
-      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      const host = window.location.hostname
-      const port = window.location.port ? `:${window.location.port}` : ''
-      
-      // For development: connect to backend on different port
-      const backendPort = window.location.hostname === 'localhost' ? ':8081' : port
-      const wsUrl = `${wsProtocol}//${host}${backendPort}/api/ws/chat/${roomId}?userId=${userId}`
+      // Build WebSocket URL using environment variable
+      // WS_BASE_URL is set by Vite (import.meta.env.VITE_WS_URL)
+      // For development: ws://localhost:8081/api/ws/chat
+      // For production: wss://backend-domain.koyeb.app/api/ws/chat (from Vercel env vars)
+      const wsUrl = `${WS_BASE_URL}/${roomId}?userId=${userId}`
       
       console.log('Connecting to WebSocket:', wsUrl)
       this.ws = new WebSocket(wsUrl)
