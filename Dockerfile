@@ -2,7 +2,7 @@
 # This file enables Docker deployment on Render.com or any Docker-compatible platform
 
 # Stage 1: Build the application
-FROM maven:3.9-eclipse-temurin-17 as builder
+FROM maven:3.9-eclipse-temurin-17 AS builder
 
 WORKDIR /build
 
@@ -24,9 +24,6 @@ COPY --from=builder /build/api-gateway/target/api-gateway-1.0.0.jar app.jar
 # Expose the port Spring Boot runs on
 EXPOSE 8081
 
-# Health check (optional but recommended)
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8081/api/actuator/health || exit 1
-
-# Run the Spring Boot application
-CMD ["java", "-jar", "app.jar"]
+# Run the Spring Boot application with proper Java options
+# Environment variables (DB_URL, DB_DIALECT, DB_DRIVER) are provided by Render
+CMD ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]
