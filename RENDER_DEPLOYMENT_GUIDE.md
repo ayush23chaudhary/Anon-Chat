@@ -100,27 +100,35 @@ Click **"Add Environment Variable"** and add these three:
 **Variable 1: DB_URL**
 ```
 Name: DB_URL
-Value: jdbc:postgresql://db.rtxijsgjrmqatmnrgkzt.supabase.co:5432/postgres?user=postgres&password=2%25W%3FRc3%40%26cxPBAA
+Value: jdbc:postgresql://db.rtxijsgjrmqatmnrgkzt.supabase.co:5432/postgres
 ```
-⚠️ **IMPORTANT**: Special characters in the password MUST be URL-encoded:
-- `%` → `%25`
-- `?` → `%3F`
-- `@` → `%40`
-- `&` (in password itself) → `%26`
+*(Notice we removed the `?user=...&password=...` from the URL to avoid character encoding issues!)*
 
-**Variable 2: DB_DIALECT**
+**Variable 2: DB_USER**
+```
+Name: DB_USER
+Value: postgres
+```
+
+**Variable 3: DB_PASSWORD**
+```
+Name: DB_PASSWORD
+Value: 2%W?Rc3@&cxPBAA
+```
+
+**Variable 4: DB_DIALECT**
 ```
 Name: DB_DIALECT
 Value: org.hibernate.dialect.PostgreSQLDialect
 ```
 
-**Variable 3: DB_DRIVER**
+**Variable 5: DB_DRIVER**
 ```
 Name: DB_DRIVER
 Value: org.postgresql.Driver
 ```
 
-**Variable 4: DB_DDL_AUTO (Optional)**
+**Variable 6: DB_DDL_AUTO (Optional)**
 ```
 Name: DB_DDL_AUTO
 Value: update
