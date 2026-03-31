@@ -97,23 +97,35 @@ Scroll down to **"Environment"** section:
 
 Click **"Add Environment Variable"** and add these three:
 
-**Variable 1:**
+**Variable 1: DB_URL**
 ```
 Name: DB_URL
-Value: jdbc:postgresql://db.rtxijsgjrmqatmnrgkzt.supabase.co:5432/postgres?user=postgres&password=2%W?Rc3@&cxPBAA
+Value: jdbc:postgresql://db.rtxijsgjrmqatmnrgkzt.supabase.co:5432/postgres?user=postgres&password=2%25W%3FRc3%40%26cxPBAA
 ```
+⚠️ **IMPORTANT**: Special characters in the password MUST be URL-encoded:
+- `%` → `%25`
+- `?` → `%3F`
+- `@` → `%40`
+- `&` (in password itself) → `%26`
 
-**Variable 2:**
+**Variable 2: DB_DIALECT**
 ```
 Name: DB_DIALECT
 Value: org.hibernate.dialect.PostgreSQLDialect
 ```
 
-**Variable 3:**
+**Variable 3: DB_DRIVER**
 ```
 Name: DB_DRIVER
 Value: org.postgresql.Driver
 ```
+
+**Variable 4: DB_DDL_AUTO (Optional)**
+```
+Name: DB_DDL_AUTO
+Value: update
+```
+This safely creates/updates schema without dropping tables. Use `create-drop` only for testing.
 
 ⚠️ **IMPORTANT**: These are **secret environment variables**. Render encrypts them and doesn't expose them in logs or source code.
 
