@@ -1,10 +1,23 @@
-# AnonChat Deployment Guide (Vercel + Koyeb + Supabase)
+# AnonChat Deployment Guide (Vercel + Koyeb/Render + Supabase)
 
 ## 📋 Overview
 This guide provides **step-by-step instructions** to deploy AnonChat across three platforms:
 - **Frontend**: Vercel (React/Vite)
-- **Backend**: Koyeb (Spring Boot API Gateway)
+- **Backend**: Koyeb (Spring Boot API Gateway) OR Render (Spring Boot API Gateway)
 - **Database**: Supabase (PostgreSQL)
+
+### Backend Comparison: Koyeb vs Render
+
+| Feature | Koyeb | Render |
+|---------|-------|--------|
+| **Free Tier** | Yes, unlimited free | Yes, limited |
+| **Auto-scaling** | Built-in | Basic |
+| **Server Sleep** | ❌ No sleep (always on) | ⚠️ Free tier spins down after 15 min |
+| **WebSocket Support** | ✅ Excellent | ✅ Good |
+| **Startup Time** | ~3-5 minutes | ~5-10 minutes first deployment |
+| **Recommended For** | Production with always-on chat | Development / Free tier testing |
+
+**Recommendation**: Use **Koyeb** for the best free-tier experience with persistent WebSocket connections.
 
 ---
 
@@ -127,6 +140,13 @@ Once the project is ready:
 ```
 jdbc:postgresql://db.rtxijsgjrmqatmnrgkzt.supabase.co:5432/postgres?user=postgres&password=2%W?Rc3@&cxPBAA
 ```
+
+**Connection String Breakdown:**
+- **Host**: `db.rtxijsgjrmqatmnrgkzt.supabase.co`
+- **Port**: `5432` (standard PostgreSQL port)
+- **Database**: `postgres`
+- **User**: `postgres`
+- **Password**: `2%W?Rc3@&cxPBAA`
 
 ⚠️ **IMPORTANT**: Keep this connection string safe! Do NOT commit it to GitHub. You will paste it as an environment variable in Koyeb (Step 3.4).
 
@@ -256,6 +276,110 @@ If it returns a response (or a valid error), the backend is live!
 
 ---
 
+## Phase 3 (Alternative): Backend Deployment (Render) 🚀
+
+**Choose Render if you prefer:** Easy deployment, good free tier documentation, but note that free tier instances restart after 15 minutes of inactivity (which may temporarily disconnect WebSocket users).
+
+### Step 3A.1: Create Render Account
+
+1. Navigate to [https://render.com/](https://render.com/)
+2. Click **"Get Started"**
+3. Sign up with **GitHub** (recommended for easy CI/CD)
+4. Authorize Render to access your GitHub repositories
+
+### Step 3A.2: Create New Service on Render
+
+1. After login, click **"New +"** (top right)
+2. Select **"Web Service"**
+3. Select **"Connect a repository"** and choose your **`Anon-Chat`** repository
+4. If you haven't already, authorize Render to access your GitHub account
+
+### Step 3A.3: Configure Build & Deployment Settings
+
+Fill in the service configuration form:
+
+1. **Name**: `anonchat-backend` (or your preferred name)
+
+2. **Environment**: Select **"Docker"** (Render will auto-detect from your repo)
+
+3. **Branch**: `main`
+
+4. **Build Command**: 
+   ```
+   cd api-gateway && mvn clean package -DskipTests
+   ```
+
+5. **Start Command**: 
+   ```
+   java -jar api-gateway/target/api-gateway-1.0.0.jar
+   ```
+
+6. **Instance Type**: Select **"Free"**
+   ⚠️ **Important**: Free tier instances spin down after 15 minutes of inactivity. To keep your server always-on, upgrade to **"Pay-As-You-Go"** (still very affordable).
+
+### Step 3A.4: Add Environment Variables
+
+Scroll down to **"Environment"** and add the following:
+
+| Key | Value |
+|-----|-------|
+| `DB_URL` | `jdbc:postgresql://db.rtxijsgjrmqatmnrgkzt.supabase.co:5432/postgres?user=postgres&password=2%W?Rc3@&cxPBAA` |
+| `DB_DIALECT` | `org.hibernate.dialect.PostgreSQLDialect` |
+| `DB_DRIVER` | `org.postgresql.Driver` |
+
+**Step-by-step in Render UI:**
+1. Scroll to "Environment" section
+2. Click "Add Environment Variable"
+3. Enter Name: `DB_URL`
+4. Enter Value: `jdbc:postgresql://db.rtxijsgjrmqatmnrgkzt.supabase.co:5432/postgres?user=postgres&password=2%W?Rc3@&cxPBAA`
+5. Click "Add Environment Variable" for each additional variable (DB_DIALECT and DB_DRIVER)
+
+### Step 3A.5: Deploy
+
+1. Scroll to the bottom and click **"Create Web Service"**
+2. Render will:
+   - Clone your GitHub repo
+   - Build the Maven project
+   - Start your Spring Boot app on port 10000 (Render's default)
+3. Wait for the status to show **"Live"** (usually takes 5-10 minutes for first deployment)
+
+### Step 3A.6: Get Your Render Backend URL
+
+1. Once deployment is successful, you'll see the service URL at the top
+2. It will look like: `https://anonchat-backend.onrender.com`
+3. **Copy this URL** (you'll need it for Vercel in Phase 4)
+
+**Example:**
+```
+Backend API Base: https://anonchat-backend.onrender.com/api
+WebSocket URL: wss://anonchat-backend.onrender.com/api/ws/chat
+```
+
+### Step 3A.7: Verify Backend is Running
+
+Test your backend is accessible:
+```bash
+curl https://anonchat-backend.onrender.com/api/health
+```
+
+If it returns a response (or a valid error), the backend is live!
+
+### Step 3A.8: Keep Your Server Alive (Recommended for Production)
+
+If you want to use Render's free tier but keep your WebSocket connections alive:
+
+**Option 1: Upgrade to Pay-As-You-Go** (Best for production)
+- Click on your service settings
+- Change plan to "Pay-As-You-Go"
+- Costs ~$0.10/hour when running
+
+**Option 2: Keep Free Tier** (Server restarts every 15 minutes)
+- Your Vercel frontend will handle reconnections automatically
+- Messages are persisted in Supabase even if server restarts
+- Less ideal for real-time chat, but still works
+
+---
+
 ## Phase 4: Frontend Deployment (Vercel) 🎨
 
 ### Step 4.1: Go to Vercel
@@ -289,20 +413,36 @@ If it returns a response (or a valid error), the backend is live!
 1. Scroll down to **"Environment Variables"**
 2. Click **"Add Environment Variable"** twice to add:
 
-**First Variable:**
+**Choose based on your backend choice:**
+
+#### If Using Koyeb (Phase 3):
 - **Name**: `VITE_API_URL`
 - **Value**: `https://my-app-name-xyz.koyeb.app/api`
   *(Replace with your actual Koyeb URL from Phase 3.7)*
 
-**Second Variable:**
 - **Name**: `VITE_WS_URL`
 - **Value**: `wss://my-app-name-xyz.koyeb.app/ws/chat`
-  *(Replace with your actual Koyeb URL, but use `wss://` for secure WebSockets)*
+  *(Use `wss://` for secure WebSockets)*
 
-**Example (filled in):**
+#### If Using Render (Phase 3A):
+- **Name**: `VITE_API_URL`
+- **Value**: `https://anonchat-backend.onrender.com/api`
+  *(Replace with your actual Render URL from Phase 3A.6)*
+
+- **Name**: `VITE_WS_URL`
+- **Value**: `wss://anonchat-backend.onrender.com/api/ws/chat`
+  *(Use `wss://` for secure WebSockets)*
+
+**Example (Koyeb - filled in):**
 ```
 VITE_API_URL = https://anonchat-backend-abc123.koyeb.app/api
 VITE_WS_URL = wss://anonchat-backend-abc123.koyeb.app/ws/chat
+```
+
+**Example (Render - filled in):**
+```
+VITE_API_URL = https://anonchat-backend.onrender.com/api
+VITE_WS_URL = wss://anonchat-backend.onrender.com/api/ws/chat
 ```
 
 ### Step 4.5: Deploy
@@ -442,18 +582,36 @@ Once everything is working, consider these improvements:
 
 ## Summary Checklist ✨
 
+### Phase 1: Codebase Preparation
 - [ ] Phase 1: Updated pom.xml, application.properties, and frontend env vars
 - [ ] Phase 1: Committed and pushed changes to GitHub
+
+### Phase 2: Database Setup
 - [ ] Phase 2: Created Supabase account and project
 - [ ] Phase 2: Retrieved and saved JDBC connection string
+
+### Phase 3: Backend Deployment (Choose One)
+
+**Option A: Koyeb**
 - [ ] Phase 3: Created Koyeb account and app
 - [ ] Phase 3: Added environment variables to Koyeb
 - [ ] Phase 3: Deployment successful (green status)
 - [ ] Phase 3: Copied Koyeb public URL
+
+**Option B: Render**
+- [ ] Phase 3A: Created Render account and service
+- [ ] Phase 3A: Added environment variables to Render
+- [ ] Phase 3A: Deployment successful (Live status)
+- [ ] Phase 3A: Copied Render public URL
+- [ ] Phase 3A: (Optional) Upgraded to Pay-As-You-Go for always-on
+
+### Phase 4: Frontend Deployment
 - [ ] Phase 4: Connected Vercel to GitHub repo
 - [ ] Phase 4: Added VITE_API_URL and VITE_WS_URL environment variables
 - [ ] Phase 4: Deployment successful
 - [ ] Phase 4: Copied Vercel frontend URL
+
+### Phase 5: Testing
 - [ ] Phase 5: Tested frontend in browser
 - [ ] Phase 5: Tested WebSocket connections
 - [ ] Phase 5: Tested database persistence
