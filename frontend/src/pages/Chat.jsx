@@ -5,8 +5,8 @@ import { LogOut, Plus, Search, Send, Zap, Shield, ArrowLeft, AlertCircle, Users,
 import Sidebar from '../components/Sidebar'
 import ChatWindow from '../components/ChatWindow'
 import ChatService from '../services/ChatService'
-import { getUserColor } from '../utils/userColorUtils'
-import { getUserNickname, getNicknameEmoji } from '../utils/userAvatarUtils'
+import { getUserColor } from '../utils/userColorUtils.ts'
+import { getUserNickname, getNicknameEmoji } from '../utils/userAvatarUtils.ts'
 import { UserAvatar } from '../components/UserAvatar'
 
 export default function Chat({ user, token, room, onLogout }) {
