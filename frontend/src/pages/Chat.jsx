@@ -5,6 +5,9 @@ import { LogOut, Plus, Search, Send, Zap, Shield, ArrowLeft, AlertCircle, Users,
 import Sidebar from '../components/Sidebar'
 import ChatWindow from '../components/ChatWindow'
 import ChatService from '../services/ChatService'
+import { getUserColor } from '../utils/userColorUtils'
+import { getUserNickname, getNicknameEmoji } from '../utils/userAvatarUtils'
+import { UserAvatar } from '../components/UserAvatar'
 
 export default function Chat({ user, token, room, onLogout }) {
   const [selectedChat, setSelectedChat] = useState(null)
@@ -49,7 +52,7 @@ export default function Chat({ user, token, room, onLogout }) {
         }
 
         const formattedMessage = {
-          id: window.crypto.randomUUID ? window.crypto.randomUUID() : Date.now() + Math.random(),
+          id: message.id || (window.crypto.randomUUID ? window.crypto.randomUUID() : Date.now() + Math.random()),
           sender: safeUserId === userId ? 'me' : 'other',
           content: content,
           timestamp: message.timestamp ? new Date(message.timestamp) : new Date(),
@@ -57,6 +60,13 @@ export default function Chat({ user, token, room, onLogout }) {
           type: message.type || 'USER',
           replyToText: message.replyToText // if any
         }
+
+        // Prevent duplicate messages - check if message with same ID already exists
+        const messageExists = prev.some(msg => msg.id === formattedMessage.id)
+        if (messageExists) {
+          return prev
+        }
+
         return [...prev, formattedMessage]
       })
     }
@@ -79,7 +89,7 @@ export default function Chat({ user, token, room, onLogout }) {
     return () => {
       ChatService.disconnect()
     }
-  }, [room, user])
+  }, [room?.id, room?.code, user?.id])
 
   // Auto-scroll when messages change
   useEffect(() => {
@@ -174,8 +184,13 @@ export default function Chat({ user, token, room, onLogout }) {
 
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {messages.map((msg, idx) => (
-            msg.type === 'SYSTEM' ? (
+          {messages.map((msg, idx) => {
+            // Get deterministic color and nickname for each user
+            const userColor = msg.sender === 'me' ? null : getUserColor(msg.userId, 'dark');
+            const nickname = msg.sender === 'me' ? 'You' : getUserNickname(msg.userId);
+            const emoji = msg.sender === 'me' ? '👤' : getNicknameEmoji(nickname);
+            
+            return msg.type === 'SYSTEM' ? (
               <motion.div 
                 key={msg.id} 
                 initial={{ opacity: 0, y: 10 }}
@@ -194,27 +209,65 @@ export default function Chat({ user, token, room, onLogout }) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.05 }}
             >
-              <div className={`relative flex items-center gap-2 ${msg.sender === 'me' ? 'flex-row-reverse' : 'flex-row'}`}>
-                <div
-                  className={`max-w-xs md:max-w-md px-4 py-3 rounded-lg ${
-                    msg.sender === 'me'
-                      ? 'bg-chat-bubbleSelf text-chat-textPrimary rounded-br-none'
-                      : 'bg-chat-bubbleOther text-chat-textPrimary rounded-bl-none'
-                  }`}
-                >
-                  {msg.replyToText && (
-                    <div className="mb-2 p-2 rounded text-xs border-l-2 bg-black/20 border-chat-primary opacity-80 overflow-hidden text-ellipsis whitespace-nowrap text-chat-textPrimary">
-                      {msg.replyToText}
+              <div className={`relative flex items-end gap-2 ${msg.sender === 'me' ? 'flex-row-reverse' : 'flex-row'}`}>
+                {/* Avatar for other users */}
+                {msg.sender !== 'me' && (
+                  <UserAvatar 
+                    userId={msg.userId}
+                    backgroundColor={userColor?.background}
+                    size={32}
+                    variant="emoji"
+                    className="flex-shrink-0"
+                  />
+                )}
+
+                <div className="flex flex-col gap-1">
+                  {/* Username label with color-coded left border */}
+                  {msg.sender !== 'me' && (
+                    <div 
+                      className="text-xs font-bold px-3 py-1 rounded-t-md text-white"
+                      style={{
+                        backgroundColor: `${userColor?.background}20`,
+                        borderLeft: `3px solid ${userColor?.background}`,
+                        color: '#FFFFFF',
+                      }}
+                    >
+                      {emoji} {nickname.split(' ').slice(1).join(' ')}
                     </div>
                   )}
-                  <p className="break-words">{msg.content}</p>
-                  <div className="flex items-center justify-between gap-4 mt-1">
-                    <p className="text-[10px] text-chat-textSecondary">
-                      {msg.sender === 'me' ? 'You' : `Anon(${msg.userId ? msg.userId.substring(0,6) : 'Unknown'})`}
-                    </p>
-                    <p className="text-[10px] text-chat-textSecondary">
-                      {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
+
+                  {/* Message bubble */}
+                  <div
+                    className={`max-w-xs md:max-w-md px-4 py-3 rounded-lg ${
+                      msg.sender === 'me'
+                        ? 'bg-chat-bubbleSelf text-chat-textPrimary rounded-br-none'
+                        : 'bg-chat-bubbleOther text-chat-textPrimary rounded-bl-none'
+                    }`}
+                    style={msg.sender !== 'me' ? {
+                      borderLeft: `4px solid ${userColor?.background}`,
+                    } : {}}
+                  >
+                    {msg.replyToText && (
+                      <div className="mb-2 p-2 rounded text-xs border-l-2 bg-black/20 border-chat-primary opacity-80 overflow-hidden text-ellipsis whitespace-nowrap text-chat-textPrimary">
+                        {msg.replyToText}
+                      </div>
+                    )}
+                    <p className="break-words">{msg.content}</p>
+                    <div className="flex items-center justify-between gap-4 mt-1">
+                      <p 
+                        className="text-[10px] font-semibold"
+                        style={msg.sender !== 'me' ? {
+                          color: userColor?.background,
+                        } : {
+                          color: '#A0AEC0'
+                        }}
+                      >
+                        {msg.sender === 'me' ? 'You' : ''}
+                      </p>
+                      <p className="text-[10px] text-chat-textSecondary">
+                        {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
@@ -227,8 +280,8 @@ export default function Chat({ user, token, room, onLogout }) {
                 </button>
               </div>
             </motion.div>
-            )
-          ))}
+            );
+          })}
           <div ref={messagesEndRef} />
         </div>
 
@@ -242,7 +295,7 @@ export default function Chat({ user, token, room, onLogout }) {
             <div className="flex items-center justify-between bg-chat-bubbleOther p-2 px-4 rounded-t-lg border-l-2 border-chat-primary text-sm mb-2 max-w-full overflow-hidden">
               <div className="flex flex-col overflow-hidden whitespace-nowrap">
                 <span className="text-chat-primary text-xs font-bold">
-                  Replying to {replyTo.sender === 'me' ? 'Yourself' : `Anon(${replyTo.userId ? replyTo.userId.substring(0,6) : 'Unknown'})`}
+                  Replying to {replyTo.sender === 'me' ? 'Yourself' : getUserNickname(replyTo.userId)}
                 </span>
                 <span className="text-chat-textSecondary text-xs truncate max-w-xs md:max-w-md">{replyTo.content}</span>
               </div>
