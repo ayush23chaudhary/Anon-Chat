@@ -41,6 +41,8 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             "SYSTEM",
             new Date()
         );
+        // Generate unique ID for this message to prevent duplicates
+        msg.setId(UUID.randomUUID().toString());
         msg.setMemberCount(rooms.get(roomId).size());
         broadcastToRoom(roomId, msg);
     }
@@ -84,6 +86,8 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                     "SYSTEM",
                     new Date()
                 );
+                // Generate unique ID for this message to prevent duplicates
+                msg.setId(UUID.randomUUID().toString());
                 msg.setMemberCount(room.size());
                 broadcastToRoom(roomId, msg);
             }
