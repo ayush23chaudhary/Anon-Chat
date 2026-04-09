@@ -18,6 +18,8 @@ class ChatService {
     this.reconnectAttempts = 0
     this.maxReconnectAttempts = 5
     this.reconnectDelay = 3000
+    this.typingTimeout = null
+    this.typingTimeoutDelay = 2000 // Stop typing indicator after 2 seconds of inactivity
   }
 
   /**
@@ -99,10 +101,75 @@ class ChatService {
 
     try {
       this.ws.send(JSON.stringify(message))
+      // Clear typing indicator when message is sent
+      this.stopTypingIndicator()
       return true
     } catch (error) {
       console.error('Failed to send message:', error)
       return false
+    }
+  }
+
+  /**
+   * Send typing indicator to the room
+   * Call this on every keystroke to show typing indicator
+   */
+  sendTypingIndicator() {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      console.warn('WebSocket not connected')
+      return
+    }
+
+    const message = {
+      roomId: this.roomId,
+      userId: this.userId,
+      type: 'TYPING',
+      isTyping: true,
+      timestamp: new Date().toISOString()
+    }
+
+    try {
+      this.ws.send(JSON.stringify(message))
+      
+      // Clear existing timeout and set new one
+      if (this.typingTimeout) {
+        clearTimeout(this.typingTimeout)
+      }
+
+      // Auto-stop typing indicator after inactivity
+      this.typingTimeout = setTimeout(() => {
+        this.stopTypingIndicator()
+      }, this.typingTimeoutDelay)
+    } catch (error) {
+      console.error('Failed to send typing indicator:', error)
+    }
+  }
+
+  /**
+   * Stop typing indicator
+   */
+  stopTypingIndicator() {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      return
+    }
+
+    if (this.typingTimeout) {
+      clearTimeout(this.typingTimeout)
+      this.typingTimeout = null
+    }
+
+    const message = {
+      roomId: this.roomId,
+      userId: this.userId,
+      type: 'TYPING',
+      isTyping: false,
+      timestamp: new Date().toISOString()
+    }
+
+    try {
+      this.ws.send(JSON.stringify(message))
+    } catch (error) {
+      console.error('Failed to stop typing indicator:', error)
     }
   }
 

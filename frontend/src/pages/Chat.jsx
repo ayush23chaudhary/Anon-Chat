@@ -8,6 +8,7 @@ import ChatService from '../services/ChatService'
 import { getUserColor } from '../utils/userColorUtils.ts'
 import { getUserNickname, getNicknameEmoji } from '../utils/userAvatarUtils.ts'
 import { UserAvatar } from '../components/UserAvatar'
+import TypingIndicator from '../components/TypingIndicator'
 
 export default function Chat({ user, token, room, onLogout }) {
   const [selectedChat, setSelectedChat] = useState(null)
@@ -16,8 +17,10 @@ export default function Chat({ user, token, room, onLogout }) {
   const [isConnected, setIsConnected] = useState(false)
   const [memberCount, setMemberCount] = useState(room?.members || 1)
   const [replyTo, setReplyTo] = useState(null)
+  const [typingUsers, setTypingUsers] = useState([]) // Track who is typing
   const navigate = useNavigate()
   const messagesEndRef = useRef(null)
+  const typingTimeoutRef = useRef({}) // Store timeouts for each user
 
   // Initialize WebSocket connection when component mounts
   useEffect(() => {
@@ -31,6 +34,35 @@ export default function Chat({ user, token, room, onLogout }) {
       if (message.error) {
         console.error("Server error message:", message.error)
         return
+      }
+
+      // Handle typing indicator events
+      if (message.type === 'TYPING') {
+        const senderId = message.userId || 'System'
+        if (message.isTyping) {
+          // User started typing
+          setTypingUsers(prev => {
+            if (!prev.includes(senderId)) {
+              return [...prev, senderId]
+            }
+            return prev
+          })
+        } else {
+          // User stopped typing
+          setTypingUsers(prev => prev.filter(id => id !== senderId))
+        }
+
+        // Set timeout to auto-remove typing indicator if no update received
+        if (typingTimeoutRef.current[senderId]) {
+          clearTimeout(typingTimeoutRef.current[senderId])
+        }
+        
+        typingTimeoutRef.current[senderId] = setTimeout(() => {
+          setTypingUsers(prev => prev.filter(id => id !== senderId))
+          delete typingTimeoutRef.current[senderId]
+        }, 3000) // Remove after 3 seconds of no activity
+
+        return // Don't add typing events to messages
       }
 
       // If it's a SYSTEM message update member count
@@ -109,6 +141,17 @@ export default function Chat({ user, token, room, onLogout }) {
       setReplyTo(null)
     } else {
       alert('Failed to send message. Connection may be lost.')
+    }
+  }
+
+  // Handle input change - send typing indicator
+  const handleInputChange = (e) => {
+    const value = e.target.value
+    setInputValue(value)
+    
+    // Send typing indicator when user types
+    if (value.length > 0 && isConnected) {
+      ChatService.sendTypingIndicator()
     }
   }
 
@@ -282,6 +325,8 @@ export default function Chat({ user, token, room, onLogout }) {
             </motion.div>
             );
           })}
+          {/* Typing indicator */}
+          <TypingIndicator typingUsers={typingUsers} />
           <div ref={messagesEndRef} />
         </div>
 
@@ -319,7 +364,7 @@ export default function Chat({ user, token, room, onLogout }) {
             <input
               type="text"
               value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
+              onChange={handleInputChange}
               placeholder={isConnected ? "Type encrypted message..." : "Connecting..."}
               disabled={!isConnected}
               className="flex-1 px-4 py-3 bg-chat-bubbleOther border border-chat-bubbleSelf rounded-lg text-chat-textPrimary placeholder-chat-textSecondary focus:outline-none focus:border-chat-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"

@@ -53,10 +53,16 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             ChatMessage chatMessage = objectMapper.readValue(message.getPayload(), ChatMessage.class);
             String roomId = chatMessage.getRoomId();
 
-            log.info("Message received - Room: {}, User: {}, Content: {}", roomId, chatMessage.getUserId(), chatMessage.getContent());
-
-            // Broadcast to all users in the room
-            broadcastToRoom(roomId, chatMessage);
+            // Check if this is a typing indicator event
+            if ("TYPING".equals(chatMessage.getType())) {
+                log.info("Typing event - Room: {}, User: {}, IsTyping: {}", roomId, chatMessage.getUserId(), chatMessage.getIsTyping());
+                // Broadcast typing indicator to all OTHER users (not the sender)
+                broadcastTypingToRoom(roomId, chatMessage);
+            } else {
+                log.info("Message received - Room: {}, User: {}, Content: {}", roomId, chatMessage.getUserId(), chatMessage.getContent());
+                // Broadcast regular message to all users in the room
+                broadcastToRoom(roomId, chatMessage);
+            }
 
         } catch (Exception e) {
             log.error("Error processing message", e);
@@ -122,6 +128,37 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                 }
             } catch (IOException e) {
                 log.error("Error sending message to session", e);
+            }
+        }
+    }
+
+    /**
+     * Broadcast typing indicator to all OTHER users in the room (exclude sender)
+     */
+    private void broadcastTypingToRoom(String roomId, ChatMessage message) {
+        Map<String, WebSocketSession> room = rooms.get(roomId);
+        if (room == null) return;
+
+        String payload = null;
+        try {
+            payload = objectMapper.writeValueAsString(message);
+        } catch (Exception e) {
+            log.error("Error serializing typing message", e);
+            return;
+        }
+
+        String senderId = message.getUserId();
+        for (Map.Entry<String, WebSocketSession> entry : room.entrySet()) {
+            // Only send typing indicator to other users, not the sender
+            if (!entry.getKey().equals(senderId)) {
+                try {
+                    WebSocketSession session = entry.getValue();
+                    if (session.isOpen() && payload != null) {
+                        session.sendMessage(new TextMessage(payload));
+                    }
+                } catch (IOException e) {
+                    log.error("Error sending typing indicator to session", e);
+                }
             }
         }
     }

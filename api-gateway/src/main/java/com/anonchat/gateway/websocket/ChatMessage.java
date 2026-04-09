@@ -16,10 +16,11 @@ public class ChatMessage {
     private String roomId;
     private String userId;
     private String content;
-    private String type; // USER, SYSTEM, NOTIFICATION
+    private String type; // USER, SYSTEM, NOTIFICATION, TYPING
     private Date timestamp;
     private Integer memberCount;
     private String replyToText;
+    private Boolean isTyping; // true when user is typing, false when they stop
 
     public ChatMessage(String roomId, String userId, String content, String type, Date timestamp) {
         this.roomId = roomId;
